@@ -1,0 +1,1408 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Интерактивное исследование рекуррентных последовательностей: формула, вычисления, график и диагностика ошибок.">
+  <meta name="theme-color" content="#13245c">
+  <title>Рекуррентные последовательности</title>
+  <link rel="preconnect" href="https://cdn.jsdelivr.net">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css">
+  <style>
+:root {
+  color-scheme: light;
+  --ink: #101a36;
+  --muted: #60708f;
+  --paper: #f5f7fc;
+  --surface: #ffffff;
+  --line: #dce3f1;
+  --navy: #13245c;
+  --blue: #3459d1;
+  --blue-2: #2447b8;
+  --aqua: #31b9aa;
+  --aqua-pale: #e6f8f5;
+  --error: #bd3448;
+  --error-pale: #fff0f2;
+  --shadow: 0 18px 50px rgba(30, 48, 94, .11);
+  --radius: 18px;
+}
+
+* { box-sizing: border-box; }
+html { min-width: 320px; }
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  color: var(--ink);
+  background:
+    linear-gradient(rgba(42, 71, 147, .045) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(42, 71, 147, .045) 1px, transparent 1px),
+    var(--paper);
+  background-size: 32px 32px;
+  font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  font-size: 16px;
+  line-height: 1.5;
+}
+
+button, input, textarea { font: inherit; }
+button { -webkit-tap-highlight-color: transparent; }
+
+.topbar {
+  background: var(--navy);
+  color: white;
+  border-bottom: 4px solid var(--aqua);
+}
+
+.topbar-inner {
+  width: min(1460px, calc(100% - 40px));
+  margin: 0 auto;
+  padding: 18px 0 16px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 13px;
+  min-width: 0;
+}
+
+.brand-mark {
+  width: 42px;
+  height: 42px;
+  border: 1px solid rgba(255,255,255,.2);
+  border-radius: 12px;
+  display: grid;
+  place-items: center;
+  background: rgba(255,255,255,.08);
+  flex: 0 0 auto;
+}
+
+.brand-mark svg { width: 27px; height: 27px; }
+
+h1 {
+  margin: 0;
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: clamp(1.35rem, 2.2vw, 1.85rem);
+  line-height: 1.1;
+  font-weight: 600;
+  letter-spacing: -.015em;
+}
+
+.top-note {
+  color: #c9d5fb;
+  font-size: .9rem;
+  white-space: nowrap;
+}
+
+main {
+  width: min(1460px, calc(100% - 40px));
+  margin: 26px auto 44px;
+}
+
+.formula-stage {
+  position: relative;
+  overflow: hidden;
+  min-height: 126px;
+  margin-bottom: 20px;
+  border-radius: var(--radius);
+  color: white;
+  background:
+    radial-gradient(circle at 88% 25%, rgba(110, 231, 216, .22), transparent 28%),
+    linear-gradient(118deg, #172f77, #243f99);
+  box-shadow: var(--shadow);
+  display: grid;
+  grid-template-columns: 190px minmax(0, 1fr);
+  align-items: stretch;
+}
+
+.formula-label {
+  padding: 25px 25px 23px;
+  background: rgba(8, 20, 63, .22);
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 3px;
+}
+
+.formula-label span {
+  color: #aebff1;
+  font-size: .78rem;
+  text-transform: uppercase;
+  letter-spacing: .12em;
+  font-weight: 700;
+}
+
+.formula-label strong { font-size: 1.05rem; font-weight: 650; }
+
+#renderedFormula {
+  min-width: 0;
+  min-height: 126px;
+  padding: 22px 34px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow-x: auto;
+  font-size: clamp(1.15rem, 2.5vw, 1.65rem);
+  scrollbar-width: thin;
+}
+
+#renderedFormula .katex-display { margin: 0; }
+
+.workspace {
+  display: grid;
+  grid-template-columns: minmax(320px, 410px) minmax(0, 1fr);
+  gap: 20px;
+  align-items: start;
+}
+
+.card {
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface);
+  box-shadow: var(--shadow);
+}
+
+.controls {
+  padding: 24px;
+  position: sticky;
+  top: 18px;
+}
+
+.section-heading {
+  margin: 0 0 18px;
+  font-size: 1.05rem;
+  font-weight: 750;
+  letter-spacing: -.01em;
+}
+
+label {
+  display: block;
+  margin-bottom: 8px;
+  color: #354260;
+  font-size: .9rem;
+  font-weight: 700;
+}
+
+.formula-input-wrap {
+  position: relative;
+  margin-bottom: 18px;
+}
+
+textarea {
+  width: 100%;
+  min-height: 116px;
+  padding: 14px 15px 34px;
+  resize: vertical;
+  color: var(--ink);
+  background: #fbfcff;
+  border: 1.5px solid #cfd8ec;
+  border-radius: 12px;
+  outline: none;
+  font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+  font-size: .93rem;
+  line-height: 1.55;
+  transition: border-color .16s, box-shadow .16s;
+}
+
+textarea:focus, input:focus {
+  border-color: var(--blue);
+  box-shadow: 0 0 0 4px rgba(52, 89, 209, .12);
+}
+
+.input-hint {
+  position: absolute;
+  right: 11px;
+  bottom: 9px;
+  color: var(--muted);
+  font-size: .73rem;
+  background: #fbfcff;
+  padding-left: 8px;
+}
+
+.field-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+  margin-bottom: 18px;
+}
+
+.field-grid > div {
+  display: flex;
+  flex-direction: column;
+}
+
+input[type="number"] {
+  width: 100%;
+  height: 44px;
+  padding: 0 11px;
+  color: var(--ink);
+  background: #fbfcff;
+  border: 1.5px solid #cfd8ec;
+  border-radius: 10px;
+  outline: none;
+}
+
+.field-grid label {
+  margin-bottom: 6px;
+  min-height: 5em;
+  display: flex;
+  align-items: flex-end;
+  font-size: .78rem;
+  line-height: 1.25;
+}
+
+.run-button {
+  width: 100%;
+  min-height: 49px;
+  border: 0;
+  border-radius: 12px;
+  color: white;
+  background: var(--blue);
+  font-weight: 750;
+  cursor: pointer;
+  box-shadow: 0 8px 20px rgba(52, 89, 209, .25);
+  transition: transform .14s, background .14s, box-shadow .14s;
+}
+
+.run-button:hover {
+  background: var(--blue-2);
+  box-shadow: 0 10px 24px rgba(52, 89, 209, .3);
+  transform: translateY(-1px);
+}
+
+.run-button:active { transform: translateY(0); }
+
+.run-button:focus-visible,
+.preset:focus-visible {
+  outline: 3px solid rgba(49, 185, 170, .45);
+  outline-offset: 2px;
+}
+
+.presets-title {
+  margin: 22px 0 10px;
+  color: var(--muted);
+  font-size: .78rem;
+  font-weight: 750;
+  text-transform: uppercase;
+  letter-spacing: .08em;
+}
+
+.presets {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.preset {
+  min-height: 35px;
+  padding: 7px 10px;
+  border: 1px solid #d3dcef;
+  border-radius: 9px;
+  color: #334467;
+  background: #f7f9fd;
+  font-size: .8rem;
+  font-weight: 650;
+  cursor: pointer;
+  transition: border-color .14s, background .14s;
+}
+
+.preset:hover {
+  border-color: #9eb0df;
+  background: #eef2fc;
+}
+
+details {
+  margin-top: 20px;
+  border-top: 1px solid var(--line);
+  padding-top: 16px;
+  color: var(--muted);
+  font-size: .84rem;
+}
+
+summary {
+  color: #405071;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+details code {
+  color: #25396e;
+  background: #eef2fb;
+  border-radius: 5px;
+  padding: 1px 4px;
+}
+
+.results {
+  display: grid;
+  gap: 20px;
+  min-width: 0;
+}
+
+.status {
+  min-height: 56px;
+  padding: 14px 17px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  border: 1px solid #bae6df;
+  border-radius: 13px;
+  color: #175e55;
+  background: var(--aqua-pale);
+}
+
+.status[hidden] { display: none; }
+
+.status.error {
+  color: #8e2436;
+  background: var(--error-pale);
+  border-color: #f0bac3;
+}
+
+.status-icon {
+  width: 28px;
+  height: 28px;
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  color: white;
+  background: var(--aqua);
+  font-size: .85rem;
+  font-weight: 900;
+}
+
+.status.error .status-icon { background: var(--error); }
+.status-copy { min-width: 0; overflow-wrap: anywhere; }
+.status-copy strong { display: block; font-size: .91rem; }
+.status-copy span { display: block; margin-top: 1px; font-size: .82rem; }
+
+.chart-card {
+  padding: 22px 22px 18px;
+  min-width: 0;
+}
+
+.chart-header {
+  margin-bottom: 12px;
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 14px;
+}
+
+.chart-header h2 { margin: 0; font-size: 1.05rem; }
+
+#chartSummary {
+  color: var(--muted);
+  font-size: .8rem;
+  text-align: right;
+}
+
+.chart-wrap {
+  position: relative;
+  width: 100%;
+  height: clamp(330px, 48vh, 530px);
+  min-height: 300px;
+  overflow: hidden;
+  border: 1px solid #e1e7f2;
+  border-radius: 13px;
+  background: #fbfcff;
+}
+
+canvas { width: 100%; height: 100%; display: block; }
+
+.tooltip {
+  position: absolute;
+  z-index: 2;
+  pointer-events: none;
+  transform: translate(-50%, calc(-100% - 12px));
+  padding: 7px 9px;
+  border-radius: 8px;
+  color: white;
+  background: rgba(16, 26, 54, .93);
+  font-size: .76rem;
+  white-space: nowrap;
+  box-shadow: 0 7px 18px rgba(16,26,54,.18);
+}
+
+.tooltip[hidden] { display: none; }
+.table-card { overflow: hidden; }
+
+.table-head {
+  padding: 17px 20px 13px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 1px solid var(--line);
+}
+
+.table-head h2 { margin: 0; font-size: 1rem; }
+.table-head span { color: var(--muted); font-size: .78rem; }
+.table-scroll { max-height: 290px; overflow: auto; }
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  font-variant-numeric: tabular-nums;
+}
+
+th, td {
+  padding: 10px 20px;
+  text-align: left;
+  border-bottom: 1px solid #edf0f6;
+}
+
+th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  color: #53617d;
+  background: #f8f9fc;
+  font-size: .76rem;
+  text-transform: uppercase;
+  letter-spacing: .06em;
+}
+
+td { font-size: .87rem; }
+td:last-child { font-family: "SFMono-Regular", Consolas, monospace; }
+tr:last-child td { border-bottom: 0; }
+
+.empty-row td {
+  padding: 34px 20px;
+  color: var(--muted);
+  text-align: center;
+  font-family: inherit;
+}
+
+@media (max-width: 900px) {
+  .workspace { grid-template-columns: 1fr; }
+  .controls { position: static; }
+  .formula-stage { grid-template-columns: 145px minmax(0, 1fr); }
+  #renderedFormula { justify-content: flex-start; }
+  .top-note { display: none; }
+}
+
+@media (max-width: 580px) {
+  .topbar-inner, main { width: min(100% - 24px, 1460px); }
+  main { margin-top: 14px; }
+  .formula-stage { grid-template-columns: 1fr; }
+  .formula-label { padding: 15px 18px; }
+  #renderedFormula { min-height: 96px; padding: 18px; }
+  .controls, .chart-card { padding: 18px; }
+  .field-grid { grid-template-columns: 1fr 1fr; }
+  .field-grid > div:last-child { grid-column: 1 / -1; }
+  .chart-wrap { height: 340px; }
+  th, td { padding-left: 15px; padding-right: 15px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    scroll-behavior: auto !important;
+    transition-duration: .01ms !important;
+  }
+}
+
+  </style>
+  <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+  <script defer>
+window.addEventListener("DOMContentLoaded", function () {
+  "use strict";
+
+  var formulaInput = document.getElementById("formula");
+  var initialInput = document.getElementById("initialValue");
+  var displayStartInput = document.getElementById("displayStart");
+  var stepsInput = document.getElementById("steps");
+  var runButton = document.getElementById("runButton");
+  var renderedFormula = document.getElementById("renderedFormula");
+  var status = document.getElementById("status");
+  var statusTitle = document.getElementById("statusTitle");
+  var statusMessage = document.getElementById("statusMessage");
+  var chart = document.getElementById("chart");
+  var chartWrap = document.getElementById("chartWrap");
+  var chartSummary = document.getElementById("chartSummary");
+  var tooltip = document.getElementById("tooltip");
+  var valueRows = document.getElementById("valueRows");
+  var rowCount = document.getElementById("rowCount");
+
+  var lastSeries = { indices: [], values: [] };
+  var chartPoints = [];
+
+  var presets = {
+    newton: {
+      formula: "\\frac{1}{2}\\left(x_n+\\frac{2}{x_n}\\right)",
+      initial: 1, displayStart: 1, steps: 10
+    },
+    root: {
+      formula: "\\sqrt{5+2x_n}",
+      initial: 1, displayStart: 1, steps: 18
+    },
+    logistic: {
+      formula: "x_n(2-x_n)",
+      initial: 0.18, displayStart: 1, steps: 14
+    },
+    cycle: {
+      formula: "\\frac{1}{1-x_n}",
+      initial: 2, displayStart: 1, steps: 12
+    },
+    error: {
+      formula: "\\sqrt{x_n-2}",
+      initial: 3, displayStart: 1, steps: 8
+    }
+  };
+
+  function FormulaError(message) {
+    this.name = "FormulaError";
+    this.message = message;
+  }
+  FormulaError.prototype = Object.create(Error.prototype);
+
+  function MathEvaluationError(message) {
+    this.name = "MathEvaluationError";
+    this.message = message;
+  }
+  MathEvaluationError.prototype = Object.create(Error.prototype);
+
+  function normalizeSource(raw) {
+    var source = raw.trim().replace(/\$/g, "");
+    var equals = source.indexOf("=");
+    if (equals !== -1) source = source.slice(equals + 1);
+    return source
+      .replace(/(\d),(\d)/g, "$1.$2")
+      .replace(/[−–—]/g, "-")
+      .replace(/x_\{\s*n\s*\}/gi, "x")
+      .replace(/x_n\b/gi, "x")
+      .replace(/\\operatorname\s*\{\s*([a-z]+)\s*\}/gi, "\\$1")
+      .replace(/\\mathrm\s*\{\s*e\s*\}/gi, "e")
+      .trim();
+  }
+
+  function tokenize(source) {
+    var tokens = [];
+    var i = 0;
+    var functions = new Set(["sin", "cos", "tan", "asin", "acos", "atan", "ln", "log", "exp", "abs"]);
+    var ignoredCommands = new Set(["left", "right", "displaystyle", "textstyle", "quad", "qquad"]);
+
+    while (i < source.length) {
+      var ch = source[i];
+
+      if (/\s/.test(ch)) {
+        i++;
+        continue;
+      }
+
+      if (ch === "\\") {
+        i++;
+        var command = "";
+        while (i < source.length && /[A-Za-z]/.test(source[i])) {
+          command += source[i++];
+        }
+
+        if (!command) {
+          if (i < source.length && /[,;!:\s]/.test(source[i])) {
+            i++;
+            continue;
+          }
+          throw new FormulaError("Неизвестная команда после обратной косой черты.");
+        }
+
+        command = command.toLowerCase();
+        if (ignoredCommands.has(command)) continue;
+        if (command === "cdot" || command === "times") {
+          tokens.push({ type: "op", value: "*" });
+        } else if (command === "frac" || command === "sqrt") {
+          tokens.push({ type: command, value: command });
+        } else if (functions.has(command)) {
+          tokens.push({ type: "func", value: command === "log" ? "ln" : command });
+        } else if (command === "pi") {
+          tokens.push({ type: "id", value: "pi" });
+        } else {
+          throw new FormulaError("Команда \\" + command + " пока не поддерживается.");
+        }
+        continue;
+      }
+
+      if (/[0-9.]/.test(ch)) {
+        var numberMatch = source.slice(i).match(/^(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][+-]?\d+)?/);
+        if (!numberMatch) throw new FormulaError("Некорректная запись числа.");
+        tokens.push({ type: "number", value: Number(numberMatch[0]) });
+        i += numberMatch[0].length;
+        continue;
+      }
+
+      if (/[A-Za-z]/.test(ch)) {
+        var wordMatch = source.slice(i).match(/^[A-Za-z]+/);
+        var word = wordMatch[0].toLowerCase();
+        i += word.length;
+        if (functions.has(word)) {
+          tokens.push({ type: "func", value: word === "log" ? "ln" : word });
+        } else if (["x", "n", "pi", "e"].indexOf(word) !== -1) {
+          tokens.push({ type: "id", value: word });
+        } else {
+          throw new FormulaError("Неизвестное обозначение «" + word + "».");
+        }
+        continue;
+      }
+
+      if ("+-*/^".indexOf(ch) !== -1) {
+        tokens.push({ type: "op", value: ch });
+        i++;
+        continue;
+      }
+
+      if ("({[".indexOf(ch) !== -1) {
+        tokens.push({ type: "lparen", value: ch });
+        i++;
+        continue;
+      }
+
+      if (")}]".indexOf(ch) !== -1) {
+        tokens.push({ type: "rparen", value: ch });
+        i++;
+        continue;
+      }
+
+      if (ch === "_") throw new FormulaError("Используйте переменную x_n или x.");
+      if (ch === "|") throw new FormulaError("Для модуля используйте abs(…).");
+      throw new FormulaError("Неожиданный символ «" + ch + "».");
+    }
+
+    tokens.push({ type: "eof", value: "" });
+    return tokens;
+  }
+
+  function canStartFactor(token) {
+    return token && ["number", "id", "lparen", "frac", "sqrt", "func"].indexOf(token.type) !== -1;
+  }
+
+  function Parser(tokens) {
+    this.tokens = tokens;
+    this.position = 0;
+  }
+
+  Parser.prototype.peek = function () {
+    return this.tokens[this.position];
+  };
+
+  Parser.prototype.take = function () {
+    return this.tokens[this.position++];
+  };
+
+  Parser.prototype.match = function (type, value) {
+    var token = this.peek();
+    if (token.type === type && (value === undefined || token.value === value)) {
+      this.position++;
+      return true;
+    }
+    return false;
+  };
+
+  Parser.prototype.parse = function () {
+    if (this.peek().type === "eof") throw new FormulaError("Введите формулу.");
+    var node = this.parseExpression();
+    if (this.peek().type !== "eof") {
+      throw new FormulaError("Не удалось разобрать формулу около «" + this.peek().value + "».");
+    }
+    return node;
+  };
+
+  Parser.prototype.parseExpression = function () {
+    var node = this.parseTerm();
+    while (this.peek().type === "op" && ["+", "-"].indexOf(this.peek().value) !== -1) {
+      var operator = this.take().value;
+      node = { type: "binary", operator: operator, left: node, right: this.parseTerm() };
+    }
+    return node;
+  };
+
+  Parser.prototype.parseTerm = function () {
+    var node = this.parseUnary();
+    while (true) {
+      if (this.peek().type === "op" && ["*", "/"].indexOf(this.peek().value) !== -1) {
+        var operator = this.take().value;
+        node = { type: "binary", operator: operator, left: node, right: this.parseUnary() };
+      } else if (canStartFactor(this.peek())) {
+        node = { type: "binary", operator: "*", left: node, right: this.parseUnary() };
+      } else {
+        break;
+      }
+    }
+    return node;
+  };
+
+  Parser.prototype.parseUnary = function () {
+    if (this.match("op", "+")) return this.parseUnary();
+    if (this.match("op", "-")) return { type: "unary", operator: "-", value: this.parseUnary() };
+    return this.parsePower();
+  };
+
+  Parser.prototype.parsePower = function () {
+    var node = this.parsePrimary();
+    if (this.match("op", "^")) {
+      node = { type: "binary", operator: "^", left: node, right: this.parseUnary() };
+    }
+    return node;
+  };
+
+  Parser.prototype.parseGroupOrUnary = function (description) {
+    if (this.match("lparen")) {
+      var node = this.parseExpression();
+      if (!this.match("rparen")) throw new FormulaError("Не закрыта скобка в " + description + ".");
+      return node;
+    }
+    if (this.peek().type === "eof") throw new FormulaError("Отсутствует аргумент в " + description + ".");
+    return this.parseUnary();
+  };
+
+  Parser.prototype.parsePrimary = function () {
+    var token = this.take();
+
+    if (token.type === "number") return { type: "number", value: token.value };
+    if (token.type === "id") return { type: "id", value: token.value };
+
+    if (token.type === "lparen") {
+      var grouped = this.parseExpression();
+      if (!this.match("rparen")) throw new FormulaError("Не закрыта скобка.");
+      return grouped;
+    }
+
+    if (token.type === "frac") {
+      var numerator = this.parseGroupOrUnary("числителе дроби");
+      var denominator = this.parseGroupOrUnary("знаменателе дроби");
+      return { type: "binary", operator: "/", left: numerator, right: denominator };
+    }
+
+    if (token.type === "sqrt") {
+      return { type: "func", name: "sqrt", value: this.parseGroupOrUnary("корне") };
+    }
+
+    if (token.type === "func") {
+      var exponent = null;
+      if (this.match("op", "^")) exponent = this.parseGroupOrUnary("показателе степени");
+      var argument = this.parseGroupOrUnary("аргументе функции " + token.value);
+      var functionNode = { type: "func", name: token.value, value: argument };
+      if (exponent) {
+        functionNode = { type: "binary", operator: "^", left: functionNode, right: exponent };
+      }
+      return functionNode;
+    }
+
+    throw new FormulaError("Ожидалось число, переменная, функция или скобка.");
+  };
+
+  function parseFormula(raw) {
+    return new Parser(tokenize(normalizeSource(raw))).parse();
+  }
+
+  function finite(value, context) {
+    if (Number.isNaN(value)) {
+      throw new MathEvaluationError(context + ": значение не является действительным числом.");
+    }
+    if (!Number.isFinite(value)) {
+      throw new MathEvaluationError(context + ": получено бесконечное значение или переполнение.");
+    }
+    return value;
+  }
+
+  function evaluate(node, scope) {
+    if (node.type === "number") return node.value;
+
+    if (node.type === "id") {
+      if (node.value === "x") return scope.x;
+      if (node.value === "n") return scope.n;
+      if (node.value === "pi") return Math.PI;
+      if (node.value === "e") return Math.E;
+    }
+
+    if (node.type === "unary") return finite(-evaluate(node.value, scope), "Унарный минус");
+
+    if (node.type === "binary") {
+      var left = evaluate(node.left, scope);
+      var right = evaluate(node.right, scope);
+      if (node.operator === "+") return finite(left + right, "Сложение");
+      if (node.operator === "-") return finite(left - right, "Вычитание");
+      if (node.operator === "*") return finite(left * right, "Умножение");
+      if (node.operator === "/") {
+        if (right === 0) throw new MathEvaluationError("Деление на ноль.");
+        return finite(left / right, "Деление");
+      }
+      if (node.operator === "^") {
+        var result = Math.pow(left, right);
+        if (Number.isNaN(result)) {
+          throw new MathEvaluationError("Степень не определена как действительное число.");
+        }
+        return finite(result, "Возведение в степень");
+      }
+    }
+
+    if (node.type === "func") {
+      var value = evaluate(node.value, scope);
+      if (node.name === "sqrt") {
+        if (value < 0) {
+          throw new MathEvaluationError("Корень из отрицательного числа: " + formatNumber(value) + ".");
+        }
+        return finite(Math.sqrt(value), "Квадратный корень");
+      }
+      if (node.name === "ln") {
+        if (value <= 0) {
+          throw new MathEvaluationError("Логарифм неположительного числа: " + formatNumber(value) + ".");
+        }
+        return finite(Math.log(value), "Логарифм");
+      }
+      if ((node.name === "asin" || node.name === "acos") && (value < -1 || value > 1)) {
+        throw new MathEvaluationError("Аргумент " + node.name + " должен принадлежать отрезку [−1, 1].");
+      }
+      var fn = {
+        sin: Math.sin, cos: Math.cos, tan: Math.tan,
+        asin: Math.asin, acos: Math.acos, atan: Math.atan,
+        exp: Math.exp, abs: Math.abs
+      }[node.name];
+      if (!fn) throw new MathEvaluationError("Неизвестная функция " + node.name + ".");
+      return finite(fn(value), "Функция " + node.name);
+    }
+
+    throw new MathEvaluationError("Не удалось вычислить выражение.");
+  }
+
+  function formatNumber(value, digits) {
+    digits = digits || 10;
+    if (!Number.isFinite(value)) return String(value);
+    if (Object.is(value, -0)) value = 0;
+    var absolute = Math.abs(value);
+    if (absolute !== 0 && (absolute >= 1e7 || absolute < 1e-6)) {
+      return value.toExponential(6).replace("e+", "e");
+    }
+    return new Intl.NumberFormat("ru-RU", {
+      maximumSignificantDigits: digits,
+      useGrouping: true
+    }).format(value);
+  }
+
+  function renderFormula() {
+    var raw = formulaInput.value.trim();
+    var latex = raw.indexOf("=") !== -1 ? raw.replace(/\$/g, "") : "x_{n+1}=" + (raw || "\\;?");
+    renderedFormula.innerHTML = "";
+    if (window.katex) {
+      try {
+        window.katex.render(latex, renderedFormula, {
+          displayMode: true,
+          throwOnError: false,
+          strict: false
+        });
+        return;
+      } catch (ignored) {}
+    }
+    renderedFormula.textContent = latex;
+  }
+
+  function showStatus(kind, title, message) {
+    status.hidden = false;
+    status.classList.toggle("error", kind === "error");
+    status.querySelector(".status-icon").textContent = kind === "error" ? "!" : "✓";
+    statusTitle.textContent = title;
+    statusMessage.textContent = message;
+  }
+
+  function fillTable(indices, values) {
+    valueRows.innerHTML = "";
+    var fragment = document.createDocumentFragment();
+    values.forEach(function (value, position) {
+      var row = document.createElement("tr");
+      var indexCell = document.createElement("td");
+      var valueCell = document.createElement("td");
+      indexCell.textContent = String(indices[position]);
+      valueCell.textContent = formatNumber(value, 12);
+      row.append(indexCell, valueCell);
+      fragment.appendChild(row);
+    });
+    valueRows.appendChild(fragment);
+    rowCount.textContent = values.length ? values.length + " знач." : "";
+  }
+
+  function niceStep(span, targetIntervals) {
+    if (!(span > 0) || !Number.isFinite(span)) return 1;
+    var roughStep = span / Math.max(1, targetIntervals);
+    var power = Math.pow(10, Math.floor(Math.log10(roughStep)));
+    var fraction = roughStep / power;
+    var multiplier = fraction <= 1 ? 1 : fraction <= 2 ? 2 : fraction <= 5 ? 5 : 10;
+    return multiplier * power;
+  }
+
+  function formatTick(value, step) {
+    if (Math.abs(value) < Math.abs(step) * 1e-9) value = 0;
+    var absolute = Math.abs(value);
+    if (absolute !== 0 && (absolute >= 1e7 || absolute < 1e-6)) {
+      return formatNumber(value, 8);
+    }
+    var absoluteStep = Math.abs(step);
+    var decimalPlaces = absoluteStep >= 1
+      ? 0
+      : Math.min(10, Math.max(0, -Math.floor(Math.log10(absoluteStep))));
+    return new Intl.NumberFormat("ru-RU", {
+      maximumFractionDigits: decimalPlaces,
+      useGrouping: true
+    }).format(value);
+  }
+
+  function drawChart(indices, values) {
+    var rect = chartWrap.getBoundingClientRect();
+    var cssWidth = Math.max(300, rect.width);
+    var cssHeight = Math.max(280, rect.height);
+    var pixelRatio = Math.min(window.devicePixelRatio || 1, 2);
+    chart.width = Math.round(cssWidth * pixelRatio);
+    chart.height = Math.round(cssHeight * pixelRatio);
+    var ctx = chart.getContext("2d");
+    ctx.setTransform(pixelRatio, 0, 0, pixelRatio, 0, 0);
+    ctx.clearRect(0, 0, cssWidth, cssHeight);
+
+    var margin = { top: 24, right: 24, bottom: 47, left: 76 };
+    var width = cssWidth - margin.left - margin.right;
+    var height = cssHeight - margin.top - margin.bottom;
+
+    ctx.fillStyle = "#fbfcff";
+    ctx.fillRect(0, 0, cssWidth, cssHeight);
+
+    if (!values.length) {
+      ctx.fillStyle = "#7b879f";
+      ctx.font = "14px system-ui, sans-serif";
+      ctx.textAlign = "center";
+      ctx.fillText("Нет значений для выбранного диапазона", cssWidth / 2, cssHeight / 2);
+      chartPoints = [];
+      return;
+    }
+
+    var rawMin = Math.min.apply(null, values);
+    var rawMax = Math.max.apply(null, values);
+    var scale = Number.isFinite(rawMax - rawMin)
+      ? 1
+      : Math.max(Math.abs(rawMin), Math.abs(rawMax), 1);
+    var scaledMin = rawMin / scale;
+    var scaledMax = rawMax / scale;
+    var paddedMin;
+    var paddedMax;
+    if (scaledMin === scaledMax) {
+      var equalPad = Math.max(Math.abs(scaledMin) * 0.1, 1);
+      paddedMin = scaledMin - equalPad;
+      paddedMax = scaledMax + equalPad;
+    } else {
+      var rangePad = (scaledMax - scaledMin) * 0.08;
+      paddedMin = scaledMin - rangePad;
+      paddedMax = scaledMax + rangePad;
+    }
+    var yTickStep = niceStep(paddedMax - paddedMin, 4);
+    var yMin = Math.floor((paddedMin + yTickStep * 1e-9) / yTickStep) * yTickStep;
+    var yMax = Math.ceil((paddedMax - yTickStep * 1e-9) / yTickStep) * yTickStep;
+    if (yMin === yMax) yMax = yMin + yTickStep;
+
+    var xDataMin = indices[0];
+    var xDataMax = indices[indices.length - 1];
+    var singleX = xDataMin === xDataMax;
+    var xMin = singleX ? xDataMin - 0.5 : xDataMin;
+    var xMax = singleX ? xDataMax + 0.5 : xDataMax;
+    var xSpan = xMax - xMin;
+    var ySpan = yMax - yMin;
+    var xOf = function (x) { return margin.left + ((x - xMin) / xSpan) * width; };
+    var yOf = function (y) { return margin.top + (1 - ((y / scale - yMin) / ySpan)) * height; };
+
+    ctx.lineWidth = 1;
+    ctx.font = "12px system-ui, sans-serif";
+    ctx.fillStyle = "#66738e";
+    ctx.strokeStyle = "#e4e8f1";
+    ctx.textBaseline = "middle";
+
+    var horizontalLines = Math.min(20, Math.max(1, Math.round(ySpan / yTickStep)));
+    for (var j = 0; j <= horizontalLines; j++) {
+      var scaledTickValue = yMax - j * yTickStep;
+      var horizontalY = yOf(scaledTickValue * scale);
+      var horizontalValue = scaledTickValue * scale;
+      ctx.beginPath();
+      ctx.moveTo(margin.left, horizontalY);
+      ctx.lineTo(margin.left + width, horizontalY);
+      ctx.stroke();
+      ctx.textAlign = "right";
+      ctx.fillText(formatTick(horizontalValue, yTickStep * scale), margin.left - 10, horizontalY);
+    }
+
+    var maxVerticalIntervals = Math.max(1, Math.min(8, Math.floor(width / 70)));
+    var xTickStep = Math.max(1, Math.ceil(niceStep(xDataMax - xDataMin, maxVerticalIntervals)));
+    for (var verticalValue = xDataMin, tickGuard = 0;
+         verticalValue <= xDataMax && tickGuard < 100;
+         verticalValue += xTickStep, tickGuard++) {
+      var verticalX = xOf(verticalValue);
+      ctx.beginPath();
+      ctx.moveTo(verticalX, margin.top);
+      ctx.lineTo(verticalX, margin.top + height);
+      ctx.stroke();
+      ctx.textAlign = "center";
+      ctx.textBaseline = "top";
+      ctx.fillText(String(verticalValue), verticalX, margin.top + height + 12);
+      ctx.textBaseline = "middle";
+    }
+
+    if (yMin <= 0 && yMax >= 0) {
+      ctx.strokeStyle = "#9ba8bf";
+      ctx.lineWidth = 1.25;
+      var zeroY = yOf(0);
+      ctx.beginPath();
+      ctx.moveTo(margin.left, zeroY);
+      ctx.lineTo(margin.left + width, zeroY);
+      ctx.stroke();
+    }
+
+    chartPoints = values.map(function (value, index) {
+      return {
+        x: xOf(indices[index]),
+        y: yOf(value),
+        index: indices[index],
+        value: value
+      };
+    });
+
+    ctx.strokeStyle = "#3459d1";
+    ctx.lineWidth = 2.25;
+    ctx.lineJoin = "round";
+    ctx.lineCap = "round";
+    ctx.beginPath();
+    chartPoints.forEach(function (point, index) {
+      if (index === 0) ctx.moveTo(point.x, point.y);
+      else ctx.lineTo(point.x, point.y);
+    });
+    ctx.stroke();
+
+    var pointRadius = values.length <= 80 ? 3.5 : 2;
+    ctx.fillStyle = "#ffffff";
+    ctx.strokeStyle = "#274cc4";
+    ctx.lineWidth = 2;
+    chartPoints.forEach(function (point) {
+      ctx.beginPath();
+      ctx.arc(point.x, point.y, pointRadius, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.stroke();
+    });
+
+    ctx.fillStyle = "#64718b";
+    ctx.font = "600 12px system-ui, sans-serif";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "bottom";
+    ctx.fillText("n", margin.left + width / 2, cssHeight - 4);
+    ctx.save();
+    ctx.translate(14, margin.top + height / 2);
+    ctx.rotate(-Math.PI / 2);
+    ctx.fillText("xₙ", 0, 0);
+    ctx.restore();
+  }
+
+  function compute() {
+    renderFormula();
+    tooltip.hidden = true;
+
+    var initial = Number(String(initialInput.value).replace(",", "."));
+    var displayStart = Number(displayStartInput.value);
+    var steps = Number(stepsInput.value);
+
+    if (!Number.isFinite(initial)) {
+      showStatus("error", "Некорректное начальное значение", "Введите конечное действительное число.");
+      return { ok: false, error: "Некорректное начальное значение." };
+    }
+    if (!Number.isInteger(displayStart) || displayStart < 1) {
+      showStatus("error", "Некорректный номер начала отображения", "Введите целое число не меньше 1.");
+      return { ok: false, error: "Номер начала отображения должен быть целым числом не меньше 1." };
+    }
+    if (!Number.isInteger(steps) || steps < 1 || steps > 2000) {
+      showStatus("error", "Некорректное число шагов", "Введите целое число от 1 до 2000.");
+      return { ok: false, error: "Число шагов должно быть целым числом от 1 до 2000." };
+    }
+    if (displayStart > steps) {
+      showStatus("error", "Некорректный диапазон отображения", "Номер начала отображения не может быть больше общего числа шагов.");
+      return { ok: false, error: "Номер начала отображения не может быть больше общего числа шагов." };
+    }
+
+    var ast;
+    try {
+      ast = parseFormula(formulaInput.value);
+    } catch (error) {
+      showStatus("error", "Формула не распознана", error.message);
+      return { ok: false, error: error.message };
+    }
+
+    var indices = [1];
+    var values = [initial];
+    var errorInfo = null;
+
+    for (var currentIndex = 1; currentIndex < steps; currentIndex++) {
+      try {
+        var next = evaluate(ast, { x: values[values.length - 1], n: currentIndex });
+        values.push(next);
+        indices.push(currentIndex + 1);
+      } catch (error) {
+        errorInfo = {
+          index: currentIndex + 1,
+          previousIndex: currentIndex,
+          previousValue: values[values.length - 1],
+          message: error.message
+        };
+        break;
+      }
+    }
+
+    var firstShownPosition = displayStart - 1;
+    var displayedIndices = indices.slice(firstShownPosition);
+    var displayedValues = values.slice(firstShownPosition);
+    lastSeries = { indices: displayedIndices, values: displayedValues };
+    fillTable(displayedIndices, displayedValues);
+    drawChart(displayedIndices, displayedValues);
+
+    if (displayedValues.length) {
+      var min = Math.min.apply(null, displayedValues);
+      var max = Math.max.apply(null, displayedValues);
+      chartSummary.textContent = "min " + formatNumber(min, 6) + " · max " + formatNumber(max, 6);
+    } else {
+      chartSummary.textContent = "нет значений для отображения";
+    }
+
+    if (errorInfo) {
+      showStatus(
+        "error",
+        "Вычисление остановлено на шаге n = " + errorInfo.index,
+        errorInfo.message + " Перед этим: x_" + errorInfo.previousIndex + " = " + formatNumber(errorInfo.previousValue, 10) + "."
+      );
+      return {
+        ok: false,
+        error: errorInfo.message,
+        errorIndex: errorInfo.index,
+        indices: displayedIndices,
+        values: displayedValues
+      };
+    } else {
+      showStatus(
+        "success",
+        "Последовательность вычислена",
+        "Вычислено " + values.length + " значений: от x_1 до x_" + indices[indices.length - 1] +
+          ". Отображение начинается с x_" + displayStart + "."
+      );
+      return { ok: true, indices: displayedIndices, values: displayedValues };
+    }
+  }
+
+  function registerWebMCP() {
+    var context = document.modelContext;
+    if (!context || typeof context.registerTool !== "function") return;
+    var lifecycle = new AbortController();
+    var tool = {
+      name: "compute_recurrence",
+      title: "Вычислить рекуррентную последовательность",
+      description: "Вводит рекуррентную формулу и параметры, вычисляет последовательность и обновляет видимые график и таблицу.",
+      inputSchema: {
+        type: "object",
+        properties: {
+          formula: { type: "string", description: "Правая часть формулы для x_(n+1), в LaTeX без знаков доллара." },
+          initialValue: { type: "number", description: "Значение начального члена x_1." },
+          displayStart: { type: "integer", minimum: 1, maximum: 2000, description: "Первый номер, показываемый на графике и в таблице." },
+          steps: { type: "integer", minimum: 1, maximum: 2000, description: "Общее число вычисляемых членов, считая от x_1." }
+        },
+        required: ["formula", "initialValue", "displayStart", "steps"],
+        additionalProperties: false
+      },
+      annotations: { readOnlyHint: false, untrustedContentHint: false },
+      execute: function (input) {
+        if (!input || typeof input.formula !== "string" || !Number.isFinite(input.initialValue) ||
+            !Number.isInteger(input.displayStart) || !Number.isInteger(input.steps) ||
+            input.displayStart < 1 || input.displayStart > input.steps ||
+            input.steps < 1 || input.steps > 2000) {
+          throw new Error("Некорректные параметры вычисления.");
+        }
+        formulaInput.value = input.formula;
+        initialInput.value = input.initialValue;
+        displayStartInput.value = input.displayStart;
+        stepsInput.value = input.steps;
+        renderFormula();
+        return compute();
+      }
+    };
+    try {
+      Promise.resolve(context.registerTool(tool, { signal: lifecycle.signal })).catch(function () {});
+      window.addEventListener("pagehide", function () { lifecycle.abort(); }, { once: true });
+    } catch (ignored) {}
+  }
+
+  formulaInput.addEventListener("input", renderFormula);
+  runButton.addEventListener("click", compute);
+  formulaInput.addEventListener("keydown", function (event) {
+    if ((event.ctrlKey || event.metaKey) && event.key === "Enter") compute();
+  });
+
+  document.querySelectorAll(".preset").forEach(function (button) {
+    button.addEventListener("click", function () {
+      var preset = presets[button.dataset.preset];
+      formulaInput.value = preset.formula;
+      initialInput.value = preset.initial;
+      displayStartInput.value = preset.displayStart;
+      stepsInput.value = preset.steps;
+      renderFormula();
+      compute();
+    });
+  });
+
+  chart.addEventListener("mousemove", function (event) {
+    if (!chartPoints.length) return;
+    var rect = chart.getBoundingClientRect();
+    var x = event.clientX - rect.left;
+    var closest = chartPoints[0];
+    var distance = Math.abs(closest.x - x);
+    chartPoints.forEach(function (point) {
+      var nextDistance = Math.abs(point.x - x);
+      if (nextDistance < distance) {
+        closest = point;
+        distance = nextDistance;
+      }
+    });
+    tooltip.hidden = false;
+    tooltip.style.left = closest.x + "px";
+    tooltip.style.top = closest.y + "px";
+    tooltip.textContent = "x_" + closest.index + " = " + formatNumber(closest.value, 10);
+  });
+
+  chart.addEventListener("mouseleave", function () {
+    tooltip.hidden = true;
+  });
+
+  if (window.ResizeObserver) {
+    var observer = new ResizeObserver(function () {
+      drawChart(lastSeries.indices, lastSeries.values);
+    });
+    observer.observe(chartWrap);
+  } else {
+    window.addEventListener("resize", function () {
+      drawChart(lastSeries.indices, lastSeries.values);
+    });
+  }
+
+  renderFormula();
+  compute();
+  registerWebMCP();
+});
+
+  </script>
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%2313245c'/%3E%3Cpath d='M13 43 24 30l10 7 16-20' fill='none' stroke='%236ee7d8' stroke-width='6' stroke-linecap='round' stroke-linejoin='round'/%3E%3Ccircle cx='13' cy='43' r='4' fill='%23fff'/%3E%3Ccircle cx='50' cy='17' r='4' fill='%23fff'/%3E%3C/svg%3E">
+</head>
+<body>
+  <header class="topbar">
+    <div class="topbar-inner">
+      <div class="brand">
+        <div class="brand-mark" aria-hidden="true">
+          <svg viewBox="0 0 32 32" fill="none">
+            <path d="M3 24 10 15l7 5L28 6" stroke="#6ee7d8" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round"/>
+            <circle cx="3" cy="24" r="2.2" fill="white"/>
+            <circle cx="28" cy="6" r="2.2" fill="white"/>
+          </svg>
+        </div>
+        <h1>Рекуррентные последовательности</h1>
+      </div>
+      <div class="top-note">Интерактивная лаборатория</div>
+    </div>
+  </header>
+
+  <main>
+    <section class="formula-stage" aria-labelledby="formula-stage-title">
+      <div class="formula-label">
+        <span id="formula-stage-title">Исследуем</span>
+        <strong>рекуррентную формулу</strong>
+      </div>
+      <div id="renderedFormula" aria-live="polite"></div>
+    </section>
+
+    <div class="workspace">
+      <aside class="card controls">
+        <h2 class="section-heading">Параметры последовательности</h2>
+
+        <label for="formula">Правая часть формулы для x<sub>n+1</sub></label>
+        <div class="formula-input-wrap">
+          <textarea id="formula" spellcheck="false" aria-describedby="formula-help">\frac{1}{2}\left(x_n+\frac{2}{x_n}\right)</textarea>
+          <div class="input-hint">LaTeX без знаков $</div>
+        </div>
+
+        <div class="field-grid">
+          <div>
+            <label for="initialValue">Начальное значение</label>
+            <input id="initialValue" type="number" value="1" step="any" inputmode="decimal">
+          </div>
+          <div>
+            <label for="displayStart">Номер, начиная с которого отображается последовательность</label>
+            <input id="displayStart" type="number" value="1" min="1" max="2000" step="1" inputmode="numeric">
+          </div>
+          <div>
+            <label for="steps">Общее число шагов (начиная с 1)</label>
+            <input id="steps" type="number" value="10" min="1" max="2000" step="1" inputmode="numeric">
+          </div>
+        </div>
+
+        <button id="runButton" class="run-button" type="button">Вычислить и построить</button>
+
+        <div class="presets-title">Примеры</div>
+        <div class="presets" aria-label="Готовые примеры">
+          <button class="preset" type="button" data-preset="newton">Метод Ньютона</button>
+          <button class="preset" type="button" data-preset="root">Корневая рекурсия</button>
+          <button class="preset" type="button" data-preset="logistic">Самокоррекция</button>
+          <button class="preset" type="button" data-preset="cycle">Трёхцикл</button>
+          <button class="preset" type="button" data-preset="error">Пример с ошибкой</button>
+        </div>
+
+        <details id="formula-help">
+          <summary>Поддерживаемая запись</summary>
+          <p>
+            Переменные: <code>x_n</code> (или <code>x</code>) и <code>n</code>.
+            Доступны <code>\frac{a}{b}</code>, <code>\sqrt{a}</code>,
+            степени, скобки, неявное умножение, <code>\sin</code>,
+            <code>\cos</code>, <code>\tan</code>, <code>\ln</code>,
+            <code>\exp</code>, <code>abs</code>, константы <code>\pi</code> и <code>e</code>.
+            Можно ввести и полное равенство — вычисляться будет его правая часть.
+          </p>
+        </details>
+      </aside>
+
+      <section class="results">
+        <div id="status" class="status" role="status" aria-live="polite" hidden>
+          <div class="status-icon" aria-hidden="true">✓</div>
+          <div class="status-copy">
+            <strong id="statusTitle"></strong>
+            <span id="statusMessage"></span>
+          </div>
+        </div>
+
+        <section class="card chart-card" aria-labelledby="chart-title">
+          <div class="chart-header">
+            <h2 id="chart-title">График последовательности</h2>
+            <div id="chartSummary"></div>
+          </div>
+          <div id="chartWrap" class="chart-wrap">
+            <canvas id="chart" aria-label="График значений рекуррентной последовательности"></canvas>
+            <div id="tooltip" class="tooltip" hidden></div>
+          </div>
+        </section>
+
+        <section class="card table-card" aria-labelledby="table-title">
+          <div class="table-head">
+            <h2 id="table-title">Вычисленные значения</h2>
+            <span id="rowCount"></span>
+          </div>
+          <div class="table-scroll">
+            <table>
+              <thead>
+                <tr>
+                  <th scope="col">Индекс n</th>
+                  <th scope="col">Значение x<sub>n</sub></th>
+                </tr>
+              </thead>
+              <tbody id="valueRows">
+                <tr class="empty-row"><td colspan="2">Значения появятся после вычисления</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+      </section>
+    </div>
+  </main>
+</body>
+</html>
