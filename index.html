@@ -391,6 +391,11 @@ details code {
 
 .chart-header {
   margin-bottom: 12px;
+  display: grid;
+  gap: 12px;
+}
+
+.chart-heading-line {
   display: flex;
   align-items: baseline;
   justify-content: space-between;
@@ -398,6 +403,43 @@ details code {
 }
 
 .chart-header h2 { margin: 0; font-size: 1.05rem; }
+
+.chart-mode-switch {
+  width: fit-content;
+  max-width: 100%;
+  padding: 3px;
+  display: flex;
+  gap: 3px;
+  border: 1px solid #d5ddef;
+  border-radius: 11px;
+  background: #f2f5fb;
+}
+
+.chart-mode-button {
+  min-height: 34px;
+  padding: 6px 12px;
+  border: 0;
+  border-radius: 8px;
+  color: #52617e;
+  background: transparent;
+  font-size: .79rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: color .14s, background .14s, box-shadow .14s;
+}
+
+.chart-mode-button:hover { color: var(--blue-2); }
+
+.chart-mode-button.active {
+  color: #213b92;
+  background: white;
+  box-shadow: 0 2px 8px rgba(36, 71, 184, .13);
+}
+
+.chart-mode-button:focus-visible {
+  outline: 3px solid rgba(49, 185, 170, .42);
+  outline-offset: 1px;
+}
 
 #chartSummary {
   color: var(--muted);
@@ -498,6 +540,10 @@ tr:last-child td { border-bottom: 0; }
   .controls, .chart-card { padding: 18px; }
   .field-grid { grid-template-columns: 1fr 1fr; }
   .field-grid > div:last-child { grid-column: 1 / -1; }
+  .chart-heading-line { align-items: flex-start; flex-direction: column; gap: 3px; }
+  #chartSummary { text-align: left; }
+  .chart-mode-switch { width: 100%; }
+  .chart-mode-button { flex: 1 1 0; padding-inline: 8px; }
   .chart-wrap { height: 340px; }
   th, td { padding-left: 15px; padding-right: 15px; }
 }
@@ -508,7 +554,6 @@ tr:last-child td { border-bottom: 0; }
     transition-duration: .01ms !important;
   }
 }
-
   </style>
   <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
   <script defer>
@@ -526,12 +571,16 @@ window.addEventListener("DOMContentLoaded", function () {
   var statusMessage = document.getElementById("statusMessage");
   var chart = document.getElementById("chart");
   var chartWrap = document.getElementById("chartWrap");
+  var chartTitle = document.getElementById("chart-title");
   var chartSummary = document.getElementById("chartSummary");
+  var chartModeButtons = document.querySelectorAll("[data-chart-mode]");
   var tooltip = document.getElementById("tooltip");
   var valueRows = document.getElementById("valueRows");
   var rowCount = document.getElementById("rowCount");
 
   var lastSeries = { indices: [], values: [] };
+  var lastComputation = null;
+  var chartMode = "sequence";
   var chartPoints = [];
 
   var presets = {
@@ -800,6 +849,18 @@ window.addEventListener("DOMContentLoaded", function () {
     return new Parser(tokenize(normalizeSource(raw))).parse();
   }
 
+  function usesIdentifier(node, identifier) {
+    if (!node) return false;
+    if (node.type === "id") return node.value === identifier;
+    if (node.type === "unary" || node.type === "func") {
+      return usesIdentifier(node.value, identifier);
+    }
+    if (node.type === "binary") {
+      return usesIdentifier(node.left, identifier) || usesIdentifier(node.right, identifier);
+    }
+    return false;
+  }
+
   function finite(value, context) {
     if (Number.isNaN(value)) {
       throw new MathEvaluationError(context + ": значение не является действительным числом.");
@@ -950,7 +1011,7 @@ window.addEventListener("DOMContentLoaded", function () {
     }).format(value);
   }
 
-  function drawChart(indices, values) {
+  function drawSequenceChart(indices, values) {
     var rect = chartWrap.getBoundingClientRect();
     var cssWidth = Math.max(300, rect.width);
     var cssHeight = Math.max(280, rect.height);
@@ -1098,6 +1159,299 @@ window.addEventListener("DOMContentLoaded", function () {
     ctx.restore();
   }
 
+  function drawCanvasMessage(ctx, width, height, title, message) {
+    chartPoints = [];
+    ctx.fillStyle = "#273756";
+    ctx.font = "700 15px system-ui, sans-serif";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillText(title, width / 2, height / 2 - 22);
+    ctx.fillStyle = "#6c7891";
+    ctx.font = "13px system-ui, sans-serif";
+    var words = message.split(/\s+/);
+    var lines = [];
+    var currentLine = "";
+    words.forEach(function (word) {
+      var candidate = currentLine ? currentLine + " " + word : word;
+      if (currentLine && ctx.measureText(candidate).width > width - 48) {
+        lines.push(currentLine);
+        currentLine = word;
+      } else {
+        currentLine = candidate;
+      }
+    });
+    if (currentLine) lines.push(currentLine);
+    lines.slice(0, 3).forEach(function (line, index) {
+      ctx.fillText(line, width / 2, height / 2 + 7 + index * 19);
+    });
+  }
+
+  function drawCobwebChart(computation) {
+    var rect = chartWrap.getBoundingClientRect();
+    var cssWidth = Math.max(300, rect.width);
+    var cssHeight = Math.max(280, rect.height);
+    var pixelRatio = Math.min(window.devicePixelRatio || 1, 2);
+    chart.width = Math.round(cssWidth * pixelRatio);
+    chart.height = Math.round(cssHeight * pixelRatio);
+    var ctx = chart.getContext("2d");
+    ctx.setTransform(pixelRatio, 0, 0, pixelRatio, 0, 0);
+    ctx.clearRect(0, 0, cssWidth, cssHeight);
+    ctx.fillStyle = "#fbfcff";
+    ctx.fillRect(0, 0, cssWidth, cssHeight);
+    chartPoints = [];
+
+    if (!computation) {
+      drawCanvasMessage(ctx, cssWidth, cssHeight, "Сначала вычислите последовательность", "После вычисления здесь появится паутинная диаграмма.");
+      return;
+    }
+
+    if (computation.usesN) {
+      drawCanvasMessage(ctx, cssWidth, cssHeight, "Паутинная диаграмма недоступна", "Формула должна иметь вид xₙ₊₁ = f(xₙ), без переменной n.");
+      return;
+    }
+
+    var values = computation.values;
+    if (!values.length) {
+      drawCanvasMessage(ctx, cssWidth, cssHeight, "Нет вычисленных значений", "Проверьте формулу и параметры последовательности.");
+      return;
+    }
+
+    var rawMin = Math.min.apply(null, values);
+    var rawMax = Math.max.apply(null, values);
+    var scale = Number.isFinite(rawMax - rawMin)
+      ? 1
+      : Math.max(Math.abs(rawMin), Math.abs(rawMax), 1);
+    var scaledValues = values.map(function (value) { return value / scale; });
+    var sequenceMin = Math.min.apply(null, scaledValues);
+    var sequenceMax = Math.max.apply(null, scaledValues);
+    var sequenceSpan = sequenceMax - sequenceMin;
+    if (!(sequenceSpan > 0)) sequenceSpan = Math.max(Math.abs(sequenceMin) * 0.3, 1);
+    var sampleMin = sequenceMin - sequenceSpan * 0.18;
+    var sampleMax = sequenceMax + sequenceSpan * 0.18;
+    if (sampleMin === sampleMax) {
+      sampleMin -= 1;
+      sampleMax += 1;
+    }
+
+    var domainMin = sampleMin;
+    var domainMax = sampleMax;
+    var sampleCenter = (sampleMin + sampleMax) / 2;
+    var sampleSpan = sampleMax - sampleMin;
+    for (var sampleIndex = 0; sampleIndex <= 300; sampleIndex++) {
+      var sampleX = sampleMin + sampleSpan * sampleIndex / 300;
+      try {
+        var sampleY = evaluate(computation.ast, { x: sampleX * scale, n: 1 }) / scale;
+        if (Number.isFinite(sampleY) && Math.abs(sampleY - sampleCenter) <= sampleSpan * 12) {
+          domainMin = Math.min(domainMin, sampleY);
+          domainMax = Math.max(domainMax, sampleY);
+        }
+      } catch (ignored) {}
+    }
+
+    var domainSpan = domainMax - domainMin;
+    if (!(domainSpan > 0) || !Number.isFinite(domainSpan)) {
+      domainMin = sequenceMin - 1;
+      domainMax = sequenceMax + 1;
+      domainSpan = domainMax - domainMin;
+    }
+    var domainPad = domainSpan * 0.08;
+    var tickStep = niceStep(domainSpan + domainPad * 2, 6);
+    domainMin = Math.floor((domainMin - domainPad) / tickStep) * tickStep;
+    domainMax = Math.ceil((domainMax + domainPad) / tickStep) * tickStep;
+    if (domainMin === domainMax) domainMax = domainMin + tickStep;
+    domainSpan = domainMax - domainMin;
+
+    var margins = { top: 22, right: 22, bottom: 50, left: 70 };
+    var availableWidth = cssWidth - margins.left - margins.right;
+    var availableHeight = cssHeight - margins.top - margins.bottom;
+    var plotSize = Math.max(120, Math.min(availableWidth, availableHeight));
+    var plotLeft = margins.left + Math.max(0, (availableWidth - plotSize) / 2);
+    var plotTop = margins.top + Math.max(0, (availableHeight - plotSize) / 2);
+    var xOf = function (x) { return plotLeft + ((x - domainMin) / domainSpan) * plotSize; };
+    var yOf = function (y) { return plotTop + (1 - (y - domainMin) / domainSpan) * plotSize; };
+
+    ctx.font = "12px system-ui, sans-serif";
+    ctx.lineWidth = 1;
+    ctx.strokeStyle = "#e4e8f1";
+    ctx.fillStyle = "#66738e";
+    var firstTick = Math.ceil((domainMin - tickStep * 1e-9) / tickStep) * tickStep;
+    for (var tick = firstTick, tickGuard = 0;
+         tick <= domainMax + tickStep * 1e-9 && tickGuard < 40;
+         tick += tickStep, tickGuard++) {
+      var tickX = xOf(tick);
+      var tickY = yOf(tick);
+      ctx.beginPath();
+      ctx.moveTo(tickX, plotTop);
+      ctx.lineTo(tickX, plotTop + plotSize);
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.moveTo(plotLeft, tickY);
+      ctx.lineTo(plotLeft + plotSize, tickY);
+      ctx.stroke();
+      ctx.textAlign = "center";
+      ctx.textBaseline = "top";
+      ctx.fillText(formatTick(tick * scale, tickStep * scale), tickX, plotTop + plotSize + 10);
+      ctx.textAlign = "right";
+      ctx.textBaseline = "middle";
+      ctx.fillText(formatTick(tick * scale, tickStep * scale), plotLeft - 9, tickY);
+    }
+
+    ctx.strokeStyle = "#aab4c8";
+    ctx.strokeRect(plotLeft, plotTop, plotSize, plotSize);
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(plotLeft, plotTop, plotSize, plotSize);
+    ctx.clip();
+
+    ctx.strokeStyle = "#7e8aa2";
+    ctx.lineWidth = 1.5;
+    ctx.setLineDash([7, 5]);
+    ctx.beginPath();
+    ctx.moveTo(xOf(domainMin), yOf(domainMin));
+    ctx.lineTo(xOf(domainMax), yOf(domainMax));
+    ctx.stroke();
+    ctx.setLineDash([]);
+
+    ctx.strokeStyle = "#3459d1";
+    ctx.lineWidth = 2.25;
+    ctx.lineJoin = "round";
+    ctx.lineCap = "round";
+    ctx.beginPath();
+    var curveStarted = false;
+    var previousCurveY = null;
+    for (var curveIndex = 0; curveIndex <= 500; curveIndex++) {
+      var curveX = domainMin + domainSpan * curveIndex / 500;
+      try {
+        var curveY = evaluate(computation.ast, { x: curveX * scale, n: 1 }) / scale;
+        var curveIsVisible = Number.isFinite(curveY) &&
+          curveY >= domainMin - domainSpan && curveY <= domainMax + domainSpan;
+        var curveIsContinuous = previousCurveY === null || Math.abs(curveY - previousCurveY) <= domainSpan * 0.75;
+        if (!curveIsVisible || !curveIsContinuous) {
+          curveStarted = false;
+          previousCurveY = curveIsVisible ? curveY : null;
+          continue;
+        }
+        if (!curveStarted) {
+          ctx.moveTo(xOf(curveX), yOf(curveY));
+          curveStarted = true;
+        } else {
+          ctx.lineTo(xOf(curveX), yOf(curveY));
+        }
+        previousCurveY = curveY;
+      } catch (ignored) {
+        curveStarted = false;
+        previousCurveY = null;
+      }
+    }
+    ctx.stroke();
+
+    if (scaledValues.length > 1) {
+      ctx.strokeStyle = "#bd3448";
+      ctx.lineWidth = 1.8;
+      ctx.lineJoin = "miter";
+      ctx.beginPath();
+      ctx.moveTo(xOf(scaledValues[0]), yOf(scaledValues[0]));
+      for (var valueIndex = 0; valueIndex < scaledValues.length - 1; valueIndex++) {
+        ctx.lineTo(xOf(scaledValues[valueIndex]), yOf(scaledValues[valueIndex + 1]));
+        ctx.lineTo(xOf(scaledValues[valueIndex + 1]), yOf(scaledValues[valueIndex + 1]));
+      }
+      ctx.stroke();
+    }
+
+    ctx.fillStyle = "#ffffff";
+    ctx.strokeStyle = "#bd3448";
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.arc(xOf(scaledValues[0]), yOf(scaledValues[0]), 3.7, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.stroke();
+    ctx.restore();
+
+    ctx.fillStyle = "rgba(255, 255, 255, .9)";
+    ctx.fillRect(plotLeft + 8, plotTop + 8, 112, scaledValues.length > 1 ? 64 : 45);
+    ctx.font = "600 11px system-ui, sans-serif";
+    ctx.textAlign = "left";
+    ctx.textBaseline = "middle";
+    ctx.strokeStyle = "#7e8aa2";
+    ctx.lineWidth = 1.5;
+    ctx.setLineDash([5, 4]);
+    ctx.beginPath();
+    ctx.moveTo(plotLeft + 16, plotTop + 22);
+    ctx.lineTo(plotLeft + 38, plotTop + 22);
+    ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.fillStyle = "#53617d";
+    ctx.fillText("y = x", plotLeft + 45, plotTop + 22);
+    ctx.strokeStyle = "#3459d1";
+    ctx.lineWidth = 2.25;
+    ctx.beginPath();
+    ctx.moveTo(plotLeft + 16, plotTop + 39);
+    ctx.lineTo(plotLeft + 38, plotTop + 39);
+    ctx.stroke();
+    ctx.fillText("y = f(x)", plotLeft + 45, plotTop + 39);
+    if (scaledValues.length > 1) {
+      ctx.strokeStyle = "#bd3448";
+      ctx.lineWidth = 1.8;
+      ctx.beginPath();
+      ctx.moveTo(plotLeft + 16, plotTop + 56);
+      ctx.lineTo(plotLeft + 38, plotTop + 56);
+      ctx.stroke();
+      ctx.fillText("итерации", plotLeft + 45, plotTop + 56);
+    }
+
+    ctx.fillStyle = "#64718b";
+    ctx.font = "600 12px system-ui, sans-serif";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "bottom";
+    ctx.fillText("x", plotLeft + plotSize / 2, cssHeight - 4);
+    ctx.save();
+    ctx.translate(14, plotTop + plotSize / 2);
+    ctx.rotate(-Math.PI / 2);
+    ctx.fillText("y", 0, 0);
+    ctx.restore();
+  }
+
+  function drawCurrentChart() {
+    tooltip.hidden = true;
+    chartModeButtons.forEach(function (button) {
+      var isActive = button.dataset.chartMode === chartMode;
+      button.classList.toggle("active", isActive);
+      button.setAttribute("aria-pressed", String(isActive));
+    });
+
+    if (chartMode === "cobweb") {
+      chartTitle.textContent = "Паутинная диаграмма";
+      chart.setAttribute("aria-label", "Паутинная диаграмма для рекуррентной последовательности");
+      if (!lastComputation) {
+        chartSummary.textContent = "";
+      } else if (lastComputation.usesN) {
+        chartSummary.textContent = "только для xₙ₊₁ = f(xₙ)";
+      } else {
+        var transitions = Math.max(0, lastComputation.values.length - 1);
+        chartSummary.textContent = "y = x · y = f(x) · " + transitions + " перех.";
+      }
+      drawCobwebChart(lastComputation);
+      return;
+    }
+
+    chartTitle.textContent = "График последовательности";
+    chart.setAttribute("aria-label", "График значений рекуррентной последовательности");
+    if (lastSeries.values.length) {
+      var min = Math.min.apply(null, lastSeries.values);
+      var max = Math.max.apply(null, lastSeries.values);
+      chartSummary.textContent = "min " + formatNumber(min, 6) + " · max " + formatNumber(max, 6);
+    } else {
+      chartSummary.textContent = "нет значений для отображения";
+    }
+    drawSequenceChart(lastSeries.indices, lastSeries.values);
+  }
+
+  function setChartMode(nextMode) {
+    if (nextMode !== "sequence" && nextMode !== "cobweb") return;
+    chartMode = nextMode;
+    drawCurrentChart();
+  }
+
   function compute() {
     renderFormula();
     tooltip.hidden = true;
@@ -1155,16 +1509,17 @@ window.addEventListener("DOMContentLoaded", function () {
     var displayedIndices = indices.slice(firstShownPosition);
     var displayedValues = values.slice(firstShownPosition);
     lastSeries = { indices: displayedIndices, values: displayedValues };
+    lastComputation = {
+      ast: ast,
+      indices: indices,
+      values: values,
+      displayedIndices: displayedIndices,
+      displayedValues: displayedValues,
+      usesN: usesIdentifier(ast, "n"),
+      errorInfo: errorInfo
+    };
     fillTable(displayedIndices, displayedValues);
-    drawChart(displayedIndices, displayedValues);
-
-    if (displayedValues.length) {
-      var min = Math.min.apply(null, displayedValues);
-      var max = Math.max.apply(null, displayedValues);
-      chartSummary.textContent = "min " + formatNumber(min, 6) + " · max " + formatNumber(max, 6);
-    } else {
-      chartSummary.textContent = "нет значений для отображения";
-    }
+    drawCurrentChart();
 
     if (errorInfo) {
       showStatus(
@@ -1249,8 +1604,17 @@ window.addEventListener("DOMContentLoaded", function () {
     });
   });
 
+  chartModeButtons.forEach(function (button) {
+    button.addEventListener("click", function () {
+      setChartMode(button.dataset.chartMode);
+    });
+  });
+
   chart.addEventListener("mousemove", function (event) {
-    if (!chartPoints.length) return;
+    if (chartMode !== "sequence" || !chartPoints.length) {
+      tooltip.hidden = true;
+      return;
+    }
     var rect = chart.getBoundingClientRect();
     var x = event.clientX - rect.left;
     var closest = chartPoints[0];
@@ -1274,12 +1638,12 @@ window.addEventListener("DOMContentLoaded", function () {
 
   if (window.ResizeObserver) {
     var observer = new ResizeObserver(function () {
-      drawChart(lastSeries.indices, lastSeries.values);
+      drawCurrentChart();
     });
     observer.observe(chartWrap);
   } else {
     window.addEventListener("resize", function () {
-      drawChart(lastSeries.indices, lastSeries.values);
+      drawCurrentChart();
     });
   }
 
@@ -1287,7 +1651,6 @@ window.addEventListener("DOMContentLoaded", function () {
   compute();
   registerWebMCP();
 });
-
   </script>
   <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%2313245c'/%3E%3Cpath d='M13 43 24 30l10 7 16-20' fill='none' stroke='%236ee7d8' stroke-width='6' stroke-linecap='round' stroke-linejoin='round'/%3E%3Ccircle cx='13' cy='43' r='4' fill='%23fff'/%3E%3Ccircle cx='50' cy='17' r='4' fill='%23fff'/%3E%3C/svg%3E">
 </head>
@@ -1377,8 +1740,14 @@ window.addEventListener("DOMContentLoaded", function () {
 
         <section class="card chart-card" aria-labelledby="chart-title">
           <div class="chart-header">
-            <h2 id="chart-title">График последовательности</h2>
-            <div id="chartSummary"></div>
+            <div class="chart-heading-line">
+              <h2 id="chart-title">График последовательности</h2>
+              <div id="chartSummary"></div>
+            </div>
+            <div class="chart-mode-switch" role="group" aria-label="Режим графика">
+              <button class="chart-mode-button active" type="button" data-chart-mode="sequence" aria-pressed="true">График последовательности</button>
+              <button class="chart-mode-button" type="button" data-chart-mode="cobweb" aria-pressed="false">Паутинная диаграмма</button>
+            </div>
           </div>
           <div id="chartWrap" class="chart-wrap">
             <canvas id="chart" aria-label="График значений рекуррентной последовательности"></canvas>
