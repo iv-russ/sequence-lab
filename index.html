@@ -1210,7 +1210,7 @@ window.addEventListener("DOMContentLoaded", function () {
       return;
     }
 
-    var values = computation.values;
+    var values = computation.displayedValues;
     if (!values.length) {
       drawCanvasMessage(ctx, cssWidth, cssHeight, "Нет вычисленных значений", "Проверьте формулу и параметры последовательности.");
       return;
@@ -1399,7 +1399,7 @@ window.addEventListener("DOMContentLoaded", function () {
       } else if (lastComputation.usesN) {
         chartSummary.textContent = "только для xₙ₊₁ = f(xₙ)";
       } else {
-        var transitions = Math.max(0, lastComputation.values.length - 1);
+        var transitions = Math.max(0, lastComputation.displayedValues.length - 1);
         chartSummary.textContent = "y = x · y = f(x) · " + transitions + " перех.";
       }
       drawCobwebChart(lastComputation);
