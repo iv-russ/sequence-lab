@@ -1225,41 +1225,13 @@ window.addEventListener("DOMContentLoaded", function () {
     var sequenceMin = Math.min.apply(null, scaledValues);
     var sequenceMax = Math.max.apply(null, scaledValues);
     var sequenceSpan = sequenceMax - sequenceMin;
-    if (!(sequenceSpan > 0)) sequenceSpan = Math.max(Math.abs(sequenceMin) * 0.3, 1);
-    var sampleMin = sequenceMin - sequenceSpan * 0.18;
-    var sampleMax = sequenceMax + sequenceSpan * 0.18;
-    if (sampleMin === sampleMax) {
-      sampleMin -= 1;
-      sampleMax += 1;
-    }
-
-    var domainMin = sampleMin;
-    var domainMax = sampleMax;
-    var sampleCenter = (sampleMin + sampleMax) / 2;
-    var sampleSpan = sampleMax - sampleMin;
-    for (var sampleIndex = 0; sampleIndex <= 300; sampleIndex++) {
-      var sampleX = sampleMin + sampleSpan * sampleIndex / 300;
-      try {
-        var sampleY = evaluate(computation.ast, { x: sampleX * scale, n: 1 }) / scale;
-        if (Number.isFinite(sampleY) && Math.abs(sampleY - sampleCenter) <= sampleSpan * 12) {
-          domainMin = Math.min(domainMin, sampleY);
-          domainMax = Math.max(domainMax, sampleY);
-        }
-      } catch (ignored) {}
-    }
-
+    var domainPad = sequenceSpan > 0
+      ? sequenceSpan * 0.08
+      : Math.max(Math.abs(sequenceMin) * 0.15, 1);
+    var domainMin = sequenceMin - domainPad;
+    var domainMax = sequenceMax + domainPad;
     var domainSpan = domainMax - domainMin;
-    if (!(domainSpan > 0) || !Number.isFinite(domainSpan)) {
-      domainMin = sequenceMin - 1;
-      domainMax = sequenceMax + 1;
-      domainSpan = domainMax - domainMin;
-    }
-    var domainPad = domainSpan * 0.08;
-    var tickStep = niceStep(domainSpan + domainPad * 2, 6);
-    domainMin = Math.floor((domainMin - domainPad) / tickStep) * tickStep;
-    domainMax = Math.ceil((domainMax + domainPad) / tickStep) * tickStep;
-    if (domainMin === domainMax) domainMax = domainMin + tickStep;
-    domainSpan = domainMax - domainMin;
+    var tickStep = niceStep(domainSpan, 6);
 
     var margins = { top: 22, right: 22, bottom: 50, left: 70 };
     var availableWidth = cssWidth - margins.left - margins.right;
